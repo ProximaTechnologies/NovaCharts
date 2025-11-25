@@ -1,0 +1,180 @@
+# --- Namespace (optional) -----------------------------------------------------
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: dragonfly-prod
+
+---
+# --- Client auth secret (password) -------------------------------------------
+apiVersion: v1
+kind: Secret
+metadata:
+  name: dragonfly-auth
+  namespace: dragonfly-prod
+type: Opaque
+stringData:
+  password: "CHANGEME-strong-random"  # rotate via sealed-secrets/external secrets in real prod
+
+---
+# --- (Example) TLS cert secret -----------------------------------------------
+# Provide a secret with keys tls.crt and tls.key (from cert-manager or your PKI).
+# See: Dragonfly With Server TLS guide. :contentReference[oaicite:1]{index=1}
+apiVersion: v1
+kind: Secret
+metadata:
+  name: dragonfly-tls
+  namespace: dragonfly-prod
+type: kubernetes.io/tls
+data:
+  tls.crt: BASE64_CERT
+  tls.key: BASE64_KEY
+
+---
+# --- Dragonfly HA instance ----------------------------------------------------
+# CRD fields documented here: spec.replicas, authentication.passwordFromSecret,
+# tlsSecretRef, snapshot.{cron,dir,persistentVolumeClaimSpec}, resources, etc. :contentReference[oaicite:2]{index=2}
+apiVersion: dragonflydb.io/v1alpha1
+kind: Dragonfly
+metadata:
+  name: dragonfly-ha
+  namespace: dragonfly-prod
+  labels:
+    app.kubernetes.io/name: dragonfly
+    app.kubernetes.io/instance: dragonfly-ha
+spec:
+  # 1 master + N-1 replicas; operator handles failover. :contentReference[oaicite:3]{index=3}
+  replicas: 3
+
+  # Pin an explicit image tag to avoid surprise upgrades. (Example tag)
+  image: "docker.dragonflydb.io/dragonflydb/dragonfly:v1.21.2"  # check latest before use. :contentReference[oaicite:4]{index=4}
+
+  # Dragonfly runtime args (keep minimal & explicit)
+  args:
+    - "--cluster_mode=emulated"        # operator-managed HA topology
+    - "--maxmemory=24gb"               # size to suit node capacity
+    - "--hz=100"                       # tuning example; adjust to your SLOs
+
+  # Auth (password) and TLS
+  authentication:
+    passwordFromSecret:
+      name: dragonfly-auth
+      key: password
+  tlsSecretRef:
+    name: dragonfly-tls
+
+  # Resources (requests/limits) — tune to your nodes & workload
+  resources:
+    requests:
+      cpu: "2"
+      memory: "16Gi"
+    limits:
+      cpu: "6"
+      memory: "32Gi"
+
+  # Scheduling for resilience
+  nodeSelector:
+    nodepool: apps
+  tolerations:
+    - key: "workload"
+      operator: "Equal"
+      value: "stateful"
+      effect: "NoSchedule"
+  affinity:
+    podAntiAffinity:
+      preferredDuringSchedulingIgnoredDuringExecution:
+        - weight: 100
+          podAffinityTerm:
+            labelSelector:
+              matchLabels:
+                app.kubernetes.io/instance: dragonfly-ha
+            topologyKey: "kubernetes.io/hostname"
+  topologySpreadConstraints:
+    - maxSkew: 1
+      topologyKey: "topology.kubernetes.io/zone"
+      whenUnsatisfiable: DoNotSchedule
+      labelSelector:
+        matchLabels:
+          app.kubernetes.io/instance: dragonfly-ha
+
+  # Service configuration (cluster-internal Redis endpoint)
+  serviceSpec:
+    type: ClusterIP
+    annotations:
+      # If you front this with an internal LB/Ingress, add your annotations here.
+      prometheus.io/scrape: "true"   # harmless; PodMonitor is preferred
+
+  # Snapshots: S3 (primary) + PVC (optional) for local persistence/restore
+  # S3 snapshots require the pod to have write perms. Prefer IRSA or workload
+  # identity; set serviceAccountName accordingly. :contentReference[oaicite:5]{index=5}
+  serviceAccountName: dragonfly-backup  # create & bind cloud IAM to this SA if using S3
+  snapshot:
+    cron: "0 */1 * * *"               # hourly snapshot cadence
+    dir: "s3://my-df-prod-backups"    # change to your bucket/path (or omit to use only PVC)
+    persistentVolumeClaimSpec:
+      accessModes: ["ReadWriteOnce"]
+      storageClassName: "fast-ssd"
+      resources:
+        requests:
+          storage: "100Gi"
+
+  # Extra labels for selecting via PodMonitor/NetworkPolicy, etc.
+  labels:
+    app: dragonfly-ha
+
+---
+# --- Prometheus PodMonitor (Prometheus Operator CRDs required) ----------------
+# The operator exposes an 'admin' port that PodMonitor can scrape. :contentReference[oaicite:6]{index=6}
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata:
+  name: dragonfly-ha
+  namespace: dragonfly-prod
+  labels:
+    release: prometheus
+spec:
+  selector:
+    matchLabels:
+      app: dragonfly-ha   # must match spec.labels on Dragonfly pods. :contentReference[oaicite:7]{index=7}
+  namespaceSelector:
+    matchNames: ["dragonfly-prod"]
+  podMetricsEndpoints:
+    - port: admin
+      interval: 15s
+      scrapeTimeout: 10s
+
+---
+# --- NetworkPolicy: default deny + allow same-namespace + selected callers ----
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: dragonfly-ha-default-deny
+  namespace: dragonfly-prod
+spec:
+  podSelector:
+    matchLabels:
+      app: dragonfly-ha
+  policyTypes: ["Ingress","Egress"]
+  ingress:
+    - from:
+        # Allow same-namespace pods (app traffic, redis-cli jobs, etc.)
+        - podSelector: {}
+        # Example: allow from app namespaces (edit to your env)
+        - namespaceSelector:
+            matchLabels:
+              access.dragonflydb.io/allow: "true"
+      ports:
+        - port: 6379   # Redis
+        - port: 6380   # TLS if you expose separately
+  egress:
+    - to:
+        - podSelector: {}         # allow intra-namespace
+        - namespaceSelector: {}   # allow kube DNS, etc. Narrow further in prod
+      ports:
+        - port: 53
+          protocol: UDP
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0       # needed for S3; restrict to cloud endpoints if possible
+      ports:
+        - port: 443
+          protocol: TCP

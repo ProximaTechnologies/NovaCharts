@@ -1,0 +1,5 @@
+image:
+  registry: registry.platwo.com
+  image: nova/nova-cfg
+  tag: latest
+  imagePullPolicy: Always
