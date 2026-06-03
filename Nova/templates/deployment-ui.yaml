@@ -14,7 +14,11 @@ spec:
       containers:
         - name: "NovaUI-{{.Release.Name}}"
           image: "{{ .Values.ui.image.registry}}/{{.Values.ui.image.image}}:{{.Values.ui.image.tag}}"
-          imagePullPolicy: Always
+          imagePullPolicy: {{.Values.ui.image.imagePullPolicy}}
           ports:
             - containerPort: 8000
+          {{- with .Values.ui.env }}
+          env:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
   replicas: {{.Values.ui.replicas}}
