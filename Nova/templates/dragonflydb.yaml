@@ -16,18 +16,39 @@ stringData:
   password: "CHANGEME-strong-random"  # rotate via sealed-secrets/external secrets in real prod
 
 ---
-# --- (Example) TLS cert secret -----------------------------------------------
-# Provide a secret with keys tls.crt and tls.key (from cert-manager or your PKI).
-# See: Dragonfly With Server TLS guide. :contentReference[oaicite:1]{index=1}
-apiVersion: v1
-kind: Secret
+# --- TLS cert managed by cert-manager ----------------------------------------
+apiVersion: cert-manager.io/v1
+kind: Issuer
+metadata:
+  name: dragonfly-selfsigned
+  namespace: dragonfly-prod
+spec:
+  selfSigned: {}
+
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
 metadata:
   name: dragonfly-tls
   namespace: dragonfly-prod
-type: kubernetes.io/tls
-data:
-  tls.crt: BASE64_CERT
-  tls.key: BASE64_KEY
+spec:
+  secretName: dragonfly-tls
+  duration: 2160h # 90 days
+  renewBefore: 360h # 15 days
+  privateKey:
+    algorithm: RSA
+    size: 2048
+  usages:
+    - server auth
+  commonName: dragonfly-ha.dragonfly-prod.svc
+  dnsNames:
+    - dragonfly-ha
+    - dragonfly-ha.dragonfly-prod
+    - dragonfly-ha.dragonfly-prod.svc
+    - dragonfly-ha.dragonfly-prod.svc.cluster.local
+  issuerRef:
+    name: dragonfly-selfsigned
+    kind: Issuer
 
 ---
 # --- Dragonfly HA instance ----------------------------------------------------
