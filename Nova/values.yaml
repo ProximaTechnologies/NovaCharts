@@ -13,6 +13,18 @@ cfg:
     - name: LOKI_URL
       value: ""
 
+postgres:
+  name: nova-db
+  certManager:
+    enabled: true
+    clusterDomain: cluster.local
+    duration: 2160h
+    renewBefore: 360h
+    privateKey:
+      algorithm: ECDSA
+      size: 256
+    serverDNSNames: []
+
 ui:
   image:
     registry: registry.platwo.com

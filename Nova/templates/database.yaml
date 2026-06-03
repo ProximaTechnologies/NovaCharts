@@ -1,10 +1,145 @@
+{{- $dbName := .Values.postgres.name | default "nova-db" -}}
+{{- $namespace := .Release.Namespace -}}
+{{- $clusterDomain := .Values.postgres.certManager.clusterDomain | default "cluster.local" -}}
+{{- $certDuration := .Values.postgres.certManager.duration | default "2160h" -}}
+{{- $certRenewBefore := .Values.postgres.certManager.renewBefore | default "360h" -}}
+{{- $privateKeyAlgorithm := .Values.postgres.certManager.privateKey.algorithm | default "ECDSA" -}}
+{{- $privateKeySize := .Values.postgres.certManager.privateKey.size | default 256 -}}
+{{- if .Values.postgres.certManager.enabled }}
+apiVersion: cert-manager.io/v1
+kind: Issuer
+metadata:
+  name: {{ $dbName }}-selfsigned
+spec:
+  selfSigned: {}
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: {{ $dbName }}-server-ca
+spec:
+  isCA: true
+  commonName: {{ $dbName }} server CA
+  secretName: {{ $dbName }}-server-ca
+  duration: {{ $certDuration | quote }}
+  renewBefore: {{ $certRenewBefore | quote }}
+  privateKey:
+    algorithm: {{ $privateKeyAlgorithm }}
+    size: {{ $privateKeySize }}
+  issuerRef:
+    name: {{ $dbName }}-selfsigned
+    kind: Issuer
+    group: cert-manager.io
+---
+apiVersion: cert-manager.io/v1
+kind: Issuer
+metadata:
+  name: {{ $dbName }}-server-ca
+spec:
+  ca:
+    secretName: {{ $dbName }}-server-ca
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: {{ $dbName }}-server-tls
+spec:
+  secretName: {{ $dbName }}-server-tls
+  duration: {{ $certDuration | quote }}
+  renewBefore: {{ $certRenewBefore | quote }}
+  secretTemplate:
+    labels:
+      cnpg.io/reload: ""
+  privateKey:
+    algorithm: {{ $privateKeyAlgorithm }}
+    size: {{ $privateKeySize }}
+  usages:
+    - server auth
+  dnsNames:
+    - {{ $dbName }}-rw
+    - {{ $dbName }}-rw.{{ $namespace }}
+    - {{ $dbName }}-rw.{{ $namespace }}.svc
+    - {{ $dbName }}-rw.{{ $namespace }}.svc.{{ $clusterDomain }}
+    - {{ $dbName }}-r
+    - {{ $dbName }}-r.{{ $namespace }}
+    - {{ $dbName }}-r.{{ $namespace }}.svc
+    - {{ $dbName }}-r.{{ $namespace }}.svc.{{ $clusterDomain }}
+    - {{ $dbName }}-ro
+    - {{ $dbName }}-ro.{{ $namespace }}
+    - {{ $dbName }}-ro.{{ $namespace }}.svc
+    - {{ $dbName }}-ro.{{ $namespace }}.svc.{{ $clusterDomain }}
+    {{- with .Values.postgres.certManager.serverDNSNames }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+  issuerRef:
+    name: {{ $dbName }}-server-ca
+    kind: Issuer
+    group: cert-manager.io
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: {{ $dbName }}-client-ca
+spec:
+  isCA: true
+  commonName: {{ $dbName }} client CA
+  secretName: {{ $dbName }}-client-ca
+  duration: {{ $certDuration | quote }}
+  renewBefore: {{ $certRenewBefore | quote }}
+  privateKey:
+    algorithm: {{ $privateKeyAlgorithm }}
+    size: {{ $privateKeySize }}
+  issuerRef:
+    name: {{ $dbName }}-selfsigned
+    kind: Issuer
+    group: cert-manager.io
+---
+apiVersion: cert-manager.io/v1
+kind: Issuer
+metadata:
+  name: {{ $dbName }}-client-ca
+spec:
+  ca:
+    secretName: {{ $dbName }}-client-ca
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: {{ $dbName }}-replication-tls
+spec:
+  secretName: {{ $dbName }}-replication-tls
+  duration: {{ $certDuration | quote }}
+  renewBefore: {{ $certRenewBefore | quote }}
+  secretTemplate:
+    labels:
+      cnpg.io/reload: ""
+  privateKey:
+    algorithm: {{ $privateKeyAlgorithm }}
+    size: {{ $privateKeySize }}
+  usages:
+    - client auth
+  commonName: streaming_replica
+  issuerRef:
+    name: {{ $dbName }}-client-ca
+    kind: Issuer
+    group: cert-manager.io
+---
+{{- end }}
 apiVersion: postgresql.cnpg.io/v1
 kind: Cluster
 metadata:
-  name: nova-db
+  name: {{ $dbName }}
 spec:
   instances: 3
   primaryUpdateStrategy: unsupervised
+{{- if .Values.postgres.certManager.enabled }}
+
+  certificates:
+    serverTLSSecret: {{ $dbName }}-server-tls
+    serverCASecret: {{ $dbName }}-server-tls
+    clientCASecret: {{ $dbName }}-replication-tls
+    replicationTLSSecret: {{ $dbName }}-replication-tls
+{{- end }}
 
   postgresql:
     parameters:
