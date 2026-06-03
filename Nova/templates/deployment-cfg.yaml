@@ -1,19 +1,19 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: "NovaCFG-{{.Release.Name}}-deployment"
+  name: "nova-cfg-{{.Release.Name}}-deployment"
 
 spec:
   selector:
     matchLabels:
-      app: "NovaCFG-{{.Release.Name}}"
+      app: "nova-cfg-{{.Release.Name}}"
   template:
     metadata:
       labels:
-        app: "NovaCFG-{{.Release.Name}}"
+        app: "nova-cfg-{{.Release.Name}}"
     spec:
       containers:
-        - name: "NovaCFG-{{.Release.Name}}"
+        - name: "nova-cfg-{{.Release.Name}}"
           image: "{{ .Values.cfg.image.registry}}/{{.Values.cfg.image.image}}:{{.Values.cfg.image.tag}}"
           imagePullPolicy: {{.Values.cfg.image.imagePullPolicy}}
           ports:

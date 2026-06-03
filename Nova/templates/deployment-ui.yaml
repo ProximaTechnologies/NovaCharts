@@ -1,18 +1,18 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: "NovaUI-{{.Release.Name}}-deployment"
+  name: "nova-ui-{{.Release.Name}}-deployment"
 spec:
   selector:
     matchLabels:
-      app: "NovaUI-{{.Release.Name}}"
+      app: "nova-ui-{{.Release.Name}}"
   template:
     metadata:
       labels:
-        app: "NovaUI-{{.Release.Name}}"
+        app: "nova-ui-{{.Release.Name}}"
     spec:
       containers:
-        - name: "NovaUI-{{.Release.Name}}"
+        - name: "nova-ui-{{.Release.Name}}"
           image: "{{ .Values.ui.image.registry}}/{{.Values.ui.image.image}}:{{.Values.ui.image.tag}}"
           imagePullPolicy: {{.Values.ui.image.imagePullPolicy}}
           ports:
