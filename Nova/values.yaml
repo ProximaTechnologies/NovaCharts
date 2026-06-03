@@ -5,6 +5,13 @@ cfg:
     tag: latest
     imagePullPolicy: Always
   replicas: 1
+  env:
+    - name: REDIS_URL
+      value: ""
+    - name: MIMIR_URL
+      value: ""
+    - name: LOKI_URL
+      value: ""
 
 ui:
   image:
@@ -13,3 +20,86 @@ ui:
     tag: latest
     imagePullPolicy: Always
   replicas: 1
+  env:
+    - name: NOVA_ENV
+      value: "production"
+    - name: DEBUG
+      value: "false"
+    - name: SECRET_KEY
+      value: ""
+    - name: ALLOWED_HOSTS
+      value: ""
+    - name: CSRF_TRUSTED_ORIGINS
+      value: ""
+    - name: DATABASE_URL
+      value: ""
+    - name: REDIS_URL
+      value: ""
+    - name: CONFIGURATION_URL
+      value: ""
+    - name: UI_URL
+      value: ""
+    - name: GRAFANA_PROTOCOL
+      value: "https"
+    - name: GRAFANA_HOST
+      value: ""
+    - name: GRAFANA_USER
+      value: ""
+    - name: GRAFANA_PASSWORD
+      value: ""
+    - name: GRAFANA_OAUTH_CLIENT_ID
+      value: ""
+    - name: GRAFANA_OAUTH_CLIENT_SECRET
+      value: ""
+    - name: NOVA_PUBLIC_URL
+      value: ""
+    - name: NOVA_OIDC_ISSUER_URL
+      value: ""
+    - name: NODE_TOKEN_TTL_MINUTES
+      value: "10"
+    - name: DASHBOARD_WEBSOCKET_REFRESH_SECONDS
+      value: "5"
+    - name: CELERY_BROKER_URL
+      value: ""
+    - name: CELERY_BACKEND
+      value: ""
+    - name: EMAIL_HOST
+      value: "localhost"
+    - name: EMAIL_PORT
+      value: "1025"
+    - name: DEFAULT_FROM_EMAIL
+      value: "Nova <noreply@nova.proxima-technologies.com>"
+    - name: GITOPS_REPO_PATH
+      value: ""
+    - name: GITOPS_MANIFEST_ROOT
+      value: "novaui"
+    - name: GITOPS_AUTO_COMMIT
+      value: "false"
+    - name: GITOPS_AUTO_PUSH
+      value: "false"
+    - name: GITOPS_COMMIT_AUTHOR_NAME
+      value: "NovaUI"
+    - name: GITOPS_COMMIT_AUTHOR_EMAIL
+      value: "novaui@localhost"
+    - name: GITOPS_PLUGINS
+      value: "config.gitops.plugins.grafana.GrafanaOperatorPlugin,config.gitops.plugins.apisix.APISIXPlugin"
+    - name: GITOPS_GRAFANA_NAMESPACE
+      value: "monitoring"
+    - name: GITOPS_GRAFANA_INSTANCE_LABEL_KEY
+      value: "dashboards"
+    - name: GITOPS_GRAFANA_ADMIN_SECRET_NAME
+      value: "grafana-admin-credentials"
+    - name: GITOPS_GRAFANA_ADMIN_USER_KEY
+      value: "GF_SECURITY_ADMIN_USER"
+    - name: GITOPS_GRAFANA_ADMIN_PASSWORD_KEY
+      value: "GF_SECURITY_ADMIN_PASSWORD"
+    - name: GITOPS_GRAFANA_RESYNC_PERIOD
+      value: "10m"
+    - name: GITOPS_MIMIR_DATASOURCE_URL
+      value: "http://mimir-nginx.monitoring.svc:9009/prometheus"
+    - name: GITOPS_LOKI_DATASOURCE_URL
+      value: "http://loki-gateway.monitoring.svc"
+    - name: GITOPS_APISIX_NAMESPACE
+      value: "ingress-apisix"
+    - name: GITOPS_APISIX_INGRESS_CLASS
+      value: "apisix"
