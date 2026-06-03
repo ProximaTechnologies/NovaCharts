@@ -115,3 +115,6 @@ ui:
       value: "ingress-apisix"
     - name: GITOPS_APISIX_INGRESS_CLASS
       value: "apisix"
+dragonfly:
+  storageClass: "standard"
+  storage: "1Gi"

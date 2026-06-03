@@ -133,10 +133,10 @@ spec:
     dir: "s3://my-df-prod-backups"    # change to your bucket/path (or omit to use only PVC)
     persistentVolumeClaimSpec:
       accessModes: ["ReadWriteOnce"]
-      storageClassName: "fast-ssd"
+      storageClassName: {{.Values.dragonfly.storageClass}}
       resources:
         requests:
-          storage: "100Gi"
+          storage: {{.Values.dragonfly.storage}}
 
   # Extra labels for selecting via PodMonitor/NetworkPolicy, etc.
   labels:
