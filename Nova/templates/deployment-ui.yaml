@@ -1,0 +1,20 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: "NovaUI-{{.Release.Name}}-deployment"
+spec:
+  selector:
+    matchLabels:
+      app: "NovaUI-{{.Release.Name}}"
+  template:
+    metadata:
+      labels:
+        app: "NovaUI-{{.Release.Name}}"
+    spec:
+      containers:
+        - name: "NovaUI-{{.Release.Name}}"
+          image: "{{ .Values.ui.image.registry}}/{{.Values.ui.image.image}}:{{.Values.ui.image.tag}}"
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8000
+  replicas: {{.Values.ui.replicas}}

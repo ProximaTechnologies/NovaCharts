@@ -1,0 +1,15 @@
+cfg:
+  image:
+    registry: registry.platwo.com
+    image: nova/nova-cfg
+    tag: latest
+    imagePullPolicy: Always
+  replicas: 1
+
+ui:
+  image:
+    registry: registry.platwo.com
+    image: nova/nova-ui
+    tag: latest
+    imagePullPolicy: Always
+  replicas: 1

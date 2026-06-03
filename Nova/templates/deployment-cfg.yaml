@@ -14,8 +14,8 @@ spec:
     spec:
       containers:
         - name: "NovaCFG-{{.Release.Name}}"
-          image: "{{ .Values.image.registry}}/{{.Values.image.image}}:{{.Values.image.tag}}"
+          image: "{{ .Values.cfg.image.registry}}/{{.Values.cfg.image.image}}:{{.Values.cfg.image.tag}}"
           imagePullPolicy: {{.Values.image.imagePullPolicy}}
           ports:
             - containerPort: 8080
-  replicas: 1
+  replicas: {{.Values.cfg.replicas}}
