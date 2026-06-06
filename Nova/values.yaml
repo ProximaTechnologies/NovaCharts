@@ -64,9 +64,11 @@ ui:
     - name: UI_URL
       value: ""
     - name: GRAFANA_PROTOCOL
-      value: "https"
+      value: "http"
     - name: GRAFANA_HOST
-      value: ""
+      value: "grafana.monitoring.svc.cluster.local:3000"
+    - name: GRAFANA_EXTERNAL_URL
+      value: "https://grafana.domain.com"
     - name: GRAFANA_USER
       value: ""
     - name: GRAFANA_PASSWORD
