@@ -35,6 +35,10 @@ ui:
     image: nova/nova-ui
     tag: latest
     imagePullPolicy: Always
+  postgresWait:
+    enabled: true
+    timeoutSeconds: 300
+    intervalSeconds: 2
   replicas: 1
   service:
     type: ClusterIP
@@ -133,7 +137,7 @@ apisixRoute:
       - "/*"
   cfg:
     enabled: true
-    host: "cfg.doamin.com"
+    host: "cfg.domain.com"
     paths:
       - "/*"
 dragonfly:

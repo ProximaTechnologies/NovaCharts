@@ -4,6 +4,7 @@ kind: ApisixRoute
 metadata:
   name: "nova-ui-{{ .Release.Name }}-route"
 spec:
+  ingressClassName: apisix
   http:
     - name: "nova-ui-{{ .Release.Name }}"
       match:
@@ -22,6 +23,7 @@ kind: ApisixRoute
 metadata:
   name: "nova-cfg-{{ .Release.Name }}-route"
 spec:
+  ingressClassName: apisix
   http:
     - name: "nova-cfg-{{ .Release.Name }}"
       match:

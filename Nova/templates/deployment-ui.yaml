@@ -1,3 +1,4 @@
+{{- $postgresWait := .Values.ui.postgresWait | default dict -}}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -12,6 +13,67 @@ spec:
         app: "nova-ui-{{.Release.Name}}"
     spec:
       initContainers:
+        {{- if not (eq $postgresWait.enabled false) }}
+        - name: "nova-ui-{{.Release.Name}}-wait-for-postgres"
+          image: "{{ .Values.ui.image.registry}}/{{.Values.ui.image.image}}:{{.Values.ui.image.tag}}"
+          imagePullPolicy: {{.Values.ui.image.imagePullPolicy}}
+          command:
+            - python
+            - -c
+            - |
+              import importlib
+              import os
+              import socket
+              import sys
+              import time
+              from urllib.parse import urlparse
+
+              database_url = os.environ.get("DATABASE_URL", "")
+              if not database_url:
+                  sys.stderr.write("DATABASE_URL is not set; cannot wait for Postgres\n")
+                  sys.exit(1)
+
+              parsed = urlparse(database_url)
+              host = parsed.hostname
+              port = parsed.port or 5432
+              if not host:
+                  sys.stderr.write("DATABASE_URL does not include a host; cannot wait for Postgres\n")
+                  sys.exit(1)
+
+              timeout = {{ $postgresWait.timeoutSeconds | default 300 }}
+              interval = {{ $postgresWait.intervalSeconds | default 2 }}
+              deadline = time.monotonic() + timeout
+
+              def wait_once():
+                  for module_name in ("psycopg", "psycopg2"):
+                      try:
+                          module = importlib.import_module(module_name)
+                      except ImportError:
+                          continue
+
+                      connection = module.connect(database_url, connect_timeout=5)
+                      connection.close()
+                      return
+
+                  with socket.create_connection((host, port), timeout=5):
+                      return
+
+              while True:
+                  try:
+                      wait_once()
+                      print(f"Postgres is reachable at {host}:{port}", flush=True)
+                      break
+                  except Exception as exc:
+                      if time.monotonic() >= deadline:
+                          sys.stderr.write(f"Timed out waiting for Postgres at {host}:{port}: {exc}\n")
+                          sys.exit(1)
+                      print(f"Waiting for Postgres at {host}:{port}: {exc}", flush=True)
+                      time.sleep(interval)
+          {{- with .Values.ui.env }}
+          env:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+        {{- end }}
         - name: "nova-ui-{{.Release.Name}}-migrate"
           image: "{{ .Values.ui.image.registry}}/{{.Values.ui.image.image}}:{{.Values.ui.image.tag}}"
           imagePullPolicy: {{.Values.ui.image.imagePullPolicy}}
