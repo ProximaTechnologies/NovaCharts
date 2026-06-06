@@ -1,0 +1,24 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: "nova-ui-{{ .Release.Name }}-bootstrap-install"
+  annotations:
+    "helm.sh/hook": post-install
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+spec:
+  backoffLimit: 1
+  template:
+    metadata:
+      labels:
+        app: "nova-ui-{{ .Release.Name }}"
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: "nova-ui-{{ .Release.Name }}-bootstrap-install"
+          image: "{{ .Values.ui.image.registry }}/{{ .Values.ui.image.image }}:{{ .Values.ui.image.tag }}"
+          imagePullPolicy: {{ .Values.ui.image.imagePullPolicy }}
+          command: ["./manage.py", "bootstrap_install"]
+          {{- with .Values.ui.env }}
+          env:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
