@@ -135,6 +135,11 @@ apisixRoute:
     host: "nova.domain.com"
     paths:
       - "/*"
+    websocket:
+      enabled: true
+      paths:
+        - "/ws/*"
+      priority: 10
   cfg:
     enabled: true
     host: "cfg.domain.com"

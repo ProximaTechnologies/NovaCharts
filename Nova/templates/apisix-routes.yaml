@@ -6,6 +6,19 @@ metadata:
 spec:
   ingressClassName: apisix
   http:
+    {{- if .Values.apisixRoute.ui.websocket.enabled }}
+    - name: "nova-ui-{{ .Release.Name }}-websocket"
+      priority: {{ .Values.apisixRoute.ui.websocket.priority }}
+      match:
+        hosts:
+          - {{ .Values.apisixRoute.ui.host | quote }}
+        paths:
+          {{- toYaml .Values.apisixRoute.ui.websocket.paths | nindent 10 }}
+      backends:
+        - serviceName: "nova-ui-{{ .Release.Name }}-service"
+          servicePort: {{ .Values.ui.service.port }}
+      websocket: true
+    {{- end }}
     - name: "nova-ui-{{ .Release.Name }}"
       match:
         hosts:
