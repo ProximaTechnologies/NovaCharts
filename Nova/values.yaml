@@ -70,9 +70,15 @@ ui:
     - name: GRAFANA_EXTERNAL_URL
       value: "https://grafana.domain.com"
     - name: GRAFANA_USER
-      value: ""
+      valueFrom:
+        secretKeyRef:
+          name: grafana-admin-credentials
+          key: GF_SECURITY_ADMIN_USER
     - name: GRAFANA_PASSWORD
-      value: ""
+      valueFrom:
+        secretKeyRef:
+          name: grafana-admin-credentials
+          key: GF_SECURITY_ADMIN_PASSWORD
     - name: GRAFANA_OAUTH_CLIENT_ID
       value: ""
     - name: GRAFANA_OAUTH_CLIENT_SECRET
