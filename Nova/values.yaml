@@ -5,6 +5,10 @@ cfg:
     tag: latest
     imagePullPolicy: Always
   replicas: 1
+  service:
+    type: ClusterIP
+    port: 80
+    targetPort: 8080
   env:
     - name: REDIS_URL
       value: ""
@@ -32,6 +36,10 @@ ui:
     tag: latest
     imagePullPolicy: Always
   replicas: 1
+  service:
+    type: ClusterIP
+    port: 80
+    targetPort: 8000
   env:
     - name: NOVA_ENV
       value: "production"
@@ -115,6 +123,19 @@ ui:
       value: "ingress-apisix"
     - name: GITOPS_APISIX_INGRESS_CLASS
       value: "apisix"
+
+apisixRoute:
+  enabled: true
+  ui:
+    enabled: true
+    host: "nova.domain.com"
+    paths:
+      - "/*"
+  cfg:
+    enabled: true
+    host: "cfg.doamin.com"
+    paths:
+      - "/*"
 dragonfly:
   storageClass: "standard"
   storage: "1Gi"

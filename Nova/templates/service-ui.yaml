@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: "nova-ui-{{ .Release.Name }}-service"
+spec:
+  type: {{ .Values.ui.service.type }}
+  selector:
+    app: "nova-ui-{{ .Release.Name }}"
+  ports:
+    - name: http
+      protocol: TCP
+      port: {{ .Values.ui.service.port }}
+      targetPort: {{ .Values.ui.service.targetPort }}
