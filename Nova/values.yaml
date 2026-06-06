@@ -136,6 +136,39 @@ ui:
     - name: GITOPS_APISIX_INGRESS_CLASS
       value: "apisix"
 
+grafana:
+  database:
+    enabled: true
+    name: grafana-db
+    instances: 1
+    database: grafana
+    owner: grafana
+    sslMode: verify-full
+    caMountPath: /etc/grafana/database
+    credentials:
+      secretName: grafana-db-credentials
+      username: grafana
+      password: "CHANGEME-grafana-db-password"
+    storage:
+      size: 1Gi
+      storageClass: standard
+    resources:
+      requests:
+        memory: "256Mi"
+        cpu: "250m"
+      limits:
+        memory: "512Mi"
+        cpu: "500m"
+    certManager:
+      enabled: true
+      clusterDomain: cluster.local
+      duration: 2160h
+      renewBefore: 360h
+      privateKey:
+        algorithm: ECDSA
+        size: 256
+      serverDNSNames: []
+
 apisixRoute:
   enabled: true
   ui:

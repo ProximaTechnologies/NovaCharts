@@ -1,0 +1,196 @@
+{{- $grafana := .Values.grafana | default dict -}}
+{{- $database := get $grafana "database" | default dict -}}
+{{- $enabled := true -}}
+{{- if hasKey $database "enabled" -}}
+{{- $enabled = $database.enabled -}}
+{{- end -}}
+{{- if $enabled -}}
+{{- $dbName := get $database "name" | default "grafana-db" -}}
+{{- $namespace := .Release.Namespace -}}
+{{- $dbDatabase := get $database "database" | default "grafana" -}}
+{{- $dbOwner := get $database "owner" | default "grafana" -}}
+{{- $credentials := get $database "credentials" | default dict -}}
+{{- $credentialsSecret := get $credentials "secretName" | default (printf "%s-credentials" $dbName) -}}
+{{- $credentialsUsername := get $credentials "username" | default $dbOwner -}}
+{{- $credentialsPassword := get $credentials "password" | default "CHANGEME-grafana-db-password" -}}
+{{- $storage := get $database "storage" | default dict -}}
+{{- $resources := get $database "resources" | default dict -}}
+{{- $certManager := get $database "certManager" | default dict -}}
+{{- $certManagerEnabled := true -}}
+{{- if hasKey $certManager "enabled" -}}
+{{- $certManagerEnabled = $certManager.enabled -}}
+{{- end -}}
+{{- $clusterDomain := get $certManager "clusterDomain" | default "cluster.local" -}}
+{{- $certDuration := get $certManager "duration" | default "2160h" -}}
+{{- $certRenewBefore := get $certManager "renewBefore" | default "360h" -}}
+{{- $privateKey := get $certManager "privateKey" | default dict -}}
+{{- $privateKeyAlgorithm := get $privateKey "algorithm" | default "ECDSA" -}}
+{{- $privateKeySize := get $privateKey "size" | default 256 -}}
+apiVersion: v1
+kind: Secret
+metadata:
+  name: {{ $credentialsSecret }}
+type: kubernetes.io/basic-auth
+stringData:
+  username: {{ $credentialsUsername | quote }}
+  password: {{ $credentialsPassword | quote }}
+---
+{{- if $certManagerEnabled }}
+apiVersion: cert-manager.io/v1
+kind: Issuer
+metadata:
+  name: {{ $dbName }}-selfsigned
+spec:
+  selfSigned: {}
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: {{ $dbName }}-server-ca
+spec:
+  isCA: true
+  commonName: {{ $dbName }} server CA
+  secretName: {{ $dbName }}-server-ca
+  duration: {{ $certDuration | quote }}
+  renewBefore: {{ $certRenewBefore | quote }}
+  privateKey:
+    algorithm: {{ $privateKeyAlgorithm }}
+    size: {{ $privateKeySize }}
+  issuerRef:
+    name: {{ $dbName }}-selfsigned
+    kind: Issuer
+    group: cert-manager.io
+---
+apiVersion: cert-manager.io/v1
+kind: Issuer
+metadata:
+  name: {{ $dbName }}-server-ca
+spec:
+  ca:
+    secretName: {{ $dbName }}-server-ca
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: {{ $dbName }}-server-tls
+spec:
+  secretName: {{ $dbName }}-server-tls
+  duration: {{ $certDuration | quote }}
+  renewBefore: {{ $certRenewBefore | quote }}
+  secretTemplate:
+    labels:
+      cnpg.io/reload: ""
+  privateKey:
+    algorithm: {{ $privateKeyAlgorithm }}
+    size: {{ $privateKeySize }}
+  usages:
+    - server auth
+  dnsNames:
+    - {{ $dbName }}-rw
+    - {{ $dbName }}-rw.{{ $namespace }}
+    - {{ $dbName }}-rw.{{ $namespace }}.svc
+    - {{ $dbName }}-rw.{{ $namespace }}.svc.{{ $clusterDomain }}
+    - {{ $dbName }}-r
+    - {{ $dbName }}-r.{{ $namespace }}
+    - {{ $dbName }}-r.{{ $namespace }}.svc
+    - {{ $dbName }}-r.{{ $namespace }}.svc.{{ $clusterDomain }}
+    - {{ $dbName }}-ro
+    - {{ $dbName }}-ro.{{ $namespace }}
+    - {{ $dbName }}-ro.{{ $namespace }}.svc
+    - {{ $dbName }}-ro.{{ $namespace }}.svc.{{ $clusterDomain }}
+    {{- with (get $certManager "serverDNSNames") }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+  issuerRef:
+    name: {{ $dbName }}-server-ca
+    kind: Issuer
+    group: cert-manager.io
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: {{ $dbName }}-client-ca
+spec:
+  isCA: true
+  commonName: {{ $dbName }} client CA
+  secretName: {{ $dbName }}-client-ca
+  duration: {{ $certDuration | quote }}
+  renewBefore: {{ $certRenewBefore | quote }}
+  privateKey:
+    algorithm: {{ $privateKeyAlgorithm }}
+    size: {{ $privateKeySize }}
+  issuerRef:
+    name: {{ $dbName }}-selfsigned
+    kind: Issuer
+    group: cert-manager.io
+---
+apiVersion: cert-manager.io/v1
+kind: Issuer
+metadata:
+  name: {{ $dbName }}-client-ca
+spec:
+  ca:
+    secretName: {{ $dbName }}-client-ca
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: {{ $dbName }}-replication-tls
+spec:
+  secretName: {{ $dbName }}-replication-tls
+  duration: {{ $certDuration | quote }}
+  renewBefore: {{ $certRenewBefore | quote }}
+  secretTemplate:
+    labels:
+      cnpg.io/reload: ""
+  privateKey:
+    algorithm: {{ $privateKeyAlgorithm }}
+    size: {{ $privateKeySize }}
+  usages:
+    - client auth
+  commonName: streaming_replica
+  issuerRef:
+    name: {{ $dbName }}-client-ca
+    kind: Issuer
+    group: cert-manager.io
+---
+{{- end }}
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: {{ $dbName }}
+spec:
+  instances: {{ get $database "instances" | default 1 }}
+  primaryUpdateStrategy: unsupervised
+  bootstrap:
+    initdb:
+      database: {{ $dbDatabase }}
+      owner: {{ $dbOwner }}
+      secret:
+        name: {{ $credentialsSecret }}
+{{- if $certManagerEnabled }}
+
+  certificates:
+    serverTLSSecret: {{ $dbName }}-server-tls
+    serverCASecret: {{ $dbName }}-server-tls
+    clientCASecret: {{ $dbName }}-replication-tls
+    replicationTLSSecret: {{ $dbName }}-replication-tls
+{{- end }}
+
+  postgresql:
+    parameters:
+      shared_buffers: {{ get $database "sharedBuffers" | default "128MB" | quote }}
+      max_connections: {{ get $database "maxConnections" | default "100" | quote }}
+
+  storage:
+    size: {{ get $storage "size" | default "1Gi" }}
+    storageClass: {{ get $storage "storageClass" | default "standard" }}
+
+{{- with $resources }}
+  resources:
+    {{- toYaml . | nindent 4 }}
+{{- end }}
+
+  monitoring:
+    enablePodMonitor: {{ get $database "enablePodMonitor" | default true }}
+{{- end }}

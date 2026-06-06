@@ -1,3 +1,22 @@
+{{- $grafana := .Values.grafana | default dict -}}
+{{- $database := get $grafana "database" | default dict -}}
+{{- $databaseEnabled := true -}}
+{{- if hasKey $database "enabled" -}}
+{{- $databaseEnabled = $database.enabled -}}
+{{- end -}}
+{{- $dbName := get $database "name" | default "grafana-db" -}}
+{{- $dbDatabase := get $database "database" | default "grafana" -}}
+{{- $credentials := get $database "credentials" | default dict -}}
+{{- $credentialsSecret := get $credentials "secretName" | default (printf "%s-credentials" $dbName) -}}
+{{- $certManager := get $database "certManager" | default dict -}}
+{{- $certManagerEnabled := true -}}
+{{- if hasKey $certManager "enabled" -}}
+{{- $certManagerEnabled = $certManager.enabled -}}
+{{- end -}}
+{{- $clusterDomain := get $certManager "clusterDomain" | default "cluster.local" -}}
+{{- $dbHost := printf "%s-rw.%s.svc.%s:5432" $dbName .Release.Namespace $clusterDomain -}}
+{{- $sslMode := get $database "sslMode" | default "verify-full" -}}
+{{- $caMountPath := get $database "caMountPath" | default "/etc/grafana/database" -}}
 apiVersion: grafana.integreatly.org/v1beta1
 kind: Grafana
 metadata:
@@ -26,6 +45,36 @@ spec:
                     secretKeyRef:
                       name: grafana-admin-credentials
                       key: GF_SECURITY_ADMIN_PASSWORD
+                {{- if $databaseEnabled }}
+                - name: GF_DATABASE_TYPE
+                  value: "postgres"
+                - name: GF_DATABASE_HOST
+                  value: {{ $dbHost | quote }}
+                - name: GF_DATABASE_NAME
+                  value: {{ $dbDatabase | quote }}
+                - name: GF_DATABASE_USER
+                  valueFrom:
+                    secretKeyRef:
+                      name: {{ $credentialsSecret }}
+                      key: username
+                - name: GF_DATABASE_PASSWORD
+                  valueFrom:
+                    secretKeyRef:
+                      name: {{ $credentialsSecret }}
+                      key: password
+                - name: GF_DATABASE_SSL_MODE
+                  value: {{ $sslMode | quote }}
+                {{- if and $certManagerEnabled (ne $sslMode "disable") }}
+                - name: GF_DATABASE_CA_CERT_PATH
+                  value: {{ printf "%s/ca.crt" $caMountPath | quote }}
+                {{- end }}
+                {{- end }}
+              {{- if and $databaseEnabled $certManagerEnabled (ne $sslMode "disable") }}
+              volumeMounts:
+                - name: grafana-db-ca
+                  mountPath: {{ $caMountPath | quote }}
+                  readOnly: true
+              {{- end }}
               resources:
                 requests:
                   cpu: 100m
@@ -33,6 +82,15 @@ spec:
                 limits:
                   cpu: 500m
                   memory: 512Mi
+          {{- if and $databaseEnabled $certManagerEnabled (ne $sslMode "disable") }}
+          volumes:
+            - name: grafana-db-ca
+              secret:
+                secretName: {{ $dbName }}-server-tls
+                items:
+                  - key: ca.crt
+                    path: ca.crt
+          {{- end }}
   service:
     spec:
       type: ClusterIP
