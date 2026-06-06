@@ -140,6 +140,13 @@ apisixRoute:
     host: "cfg.domain.com"
     paths:
       - "/*"
+  grafana:
+    enabled: true
+    host: "grafana.domain.com"
+    paths:
+      - "/*"
+    serviceName: "nova-grafana-service"
+    servicePort: 3000
 dragonfly:
   storageClass: "standard"
   storage: "1Gi"

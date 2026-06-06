@@ -35,3 +35,22 @@ spec:
         - serviceName: "nova-cfg-{{ .Release.Name }}-service"
           servicePort: {{ .Values.cfg.service.port }}
 {{- end }}
+{{- if and .Values.apisixRoute.enabled .Values.apisixRoute.grafana.enabled }}
+---
+apiVersion: apisix.apache.org/v2
+kind: ApisixRoute
+metadata:
+  name: "nova-grafana-{{ .Release.Name }}-route"
+spec:
+  ingressClassName: apisix
+  http:
+    - name: "nova-grafana-{{ .Release.Name }}"
+      match:
+        hosts:
+          - {{ .Values.apisixRoute.grafana.host | quote }}
+        paths:
+          {{- toYaml .Values.apisixRoute.grafana.paths | nindent 10 }}
+      backends:
+        - serviceName: {{ .Values.apisixRoute.grafana.serviceName | quote }}
+          servicePort: {{ .Values.apisixRoute.grafana.servicePort }}
+{{- end }}
