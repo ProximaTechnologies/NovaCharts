@@ -19,6 +19,10 @@ cfg:
 
 postgres:
   name: nova-db
+  database: nova
+  owner: nova
+  credentials:
+    secretName: nova-db-app
   certManager:
     enabled: true
     clusterDomain: cluster.local

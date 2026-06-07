@@ -1,4 +1,8 @@
 {{- $dbName := .Values.postgres.name | default "nova-db" -}}
+{{- $database := .Values.postgres.database | default "nova" -}}
+{{- $owner := .Values.postgres.owner | default "nova" -}}
+{{- $credentials := .Values.postgres.credentials | default dict -}}
+{{- $credentialsSecret := get $credentials "secretName" | default (printf "%s-app" $dbName) -}}
 {{- $namespace := .Release.Namespace -}}
 {{- $clusterDomain := .Values.postgres.certManager.clusterDomain | default "cluster.local" -}}
 {{- $certDuration := .Values.postgres.certManager.duration | default "2160h" -}}
@@ -132,6 +136,12 @@ metadata:
 spec:
   instances: 3
   primaryUpdateStrategy: unsupervised
+  bootstrap:
+    initdb:
+      database: {{ $database | quote }}
+      owner: {{ $owner | quote }}
+      secret:
+        name: {{ $credentialsSecret }}
 {{- if .Values.postgres.certManager.enabled }}
 
   certificates:
