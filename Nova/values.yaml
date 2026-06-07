@@ -208,6 +208,31 @@ dragonfly:
     limits:
       cpu: "6"
       memory: "32Gi"
+  scheduling:
+    enabled: false
+    nodeSelector:
+      nodepool: apps
+    tolerations:
+      - key: "workload"
+        operator: "Equal"
+        value: "stateful"
+        effect: "NoSchedule"
+    affinity:
+      podAntiAffinity:
+        preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchLabels:
+                  app.kubernetes.io/instance: dragonfly-ha
+              topologyKey: "kubernetes.io/hostname"
+    topologySpreadConstraints:
+      - maxSkew: 1
+        topologyKey: "topology.kubernetes.io/zone"
+        whenUnsatisfiable: DoNotSchedule
+        labelSelector:
+          matchLabels:
+            app.kubernetes.io/instance: dragonfly-ha
   s3:
     ACCESS_KEY_ID: "test"
     SECRET_KEY_ID: "test"
