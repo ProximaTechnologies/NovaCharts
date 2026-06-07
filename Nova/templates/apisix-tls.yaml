@@ -1,6 +1,6 @@
 {{- $routeTls := .Values.apisixRoute.tls | default dict -}}
 {{- $defaultSecretName := get $routeTls "secretName" | default "" -}}
-{{- $defaultSecretNamespace := default .Release.Namespace (get $routeTls "secretNamespace") -}}
+{{- $defaultSecretNamespace := get $routeTls "secretNamespace" | default "cert-manager" -}}
 {{- $uiTls := .Values.apisixRoute.ui.tls | default dict -}}
 {{- $uiSecretName := get $uiTls "secretName" | default $defaultSecretName -}}
 {{- $cfgTls := .Values.apisixRoute.cfg.tls | default dict -}}
