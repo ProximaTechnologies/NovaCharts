@@ -70,7 +70,7 @@ ui:
     - name: GRAFANA_PROTOCOL
       value: "http"
     - name: GRAFANA_HOST
-      value: "grafana.nova.svc.cluster.local:3000"
+      value: "nova-grafana.nova.svc.cluster.local:3000"
     - name: GRAFANA_EXTERNAL_URL
       value: "https://grafana.domain.com"
     - name: GRAFANA_USER
