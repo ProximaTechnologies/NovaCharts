@@ -177,9 +177,15 @@ grafana:
 
 apisixRoute:
   enabled: true
+  tls:
+    enabled: true
+    secretNamespace: ""
   ui:
     enabled: true
     host: "nova.domain.com"
+    tls:
+      enabled: true
+      secretName: "nova-tls"
     paths:
       - "/*"
     websocket:
@@ -190,11 +196,17 @@ apisixRoute:
   cfg:
     enabled: true
     host: "cfg.domain.com"
+    tls:
+      enabled: true
+      secretName: "nova-tls"
     paths:
       - "/*"
   grafana:
     enabled: true
     host: "grafana.domain.com"
+    tls:
+      enabled: true
+      secretName: "nova-tls"
     paths:
       - "/*"
     serviceName: "nova-grafana-service"
