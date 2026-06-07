@@ -1,15 +1,24 @@
-{{- $defaultSecretNamespace := default .Release.Namespace .Values.apisixRoute.tls.secretNamespace -}}
+{{- $routeTls := .Values.apisixRoute.tls | default dict -}}
+{{- $defaultSecretName := get $routeTls "secretName" | default "" -}}
+{{- $defaultSecretNamespace := default .Release.Namespace (get $routeTls "secretNamespace") -}}
+{{- $uiTls := .Values.apisixRoute.ui.tls | default dict -}}
+{{- $uiSecretName := get $uiTls "secretName" | default $defaultSecretName -}}
+{{- $cfgTls := .Values.apisixRoute.cfg.tls | default dict -}}
+{{- $cfgSecretName := get $cfgTls "secretName" | default $defaultSecretName -}}
+{{- $grafanaTls := .Values.apisixRoute.grafana.tls | default dict -}}
+{{- $grafanaSecretName := get $grafanaTls "secretName" | default $defaultSecretName -}}
 {{- if and .Values.apisixRoute.enabled .Values.apisixRoute.tls.enabled .Values.apisixRoute.ui.enabled .Values.apisixRoute.ui.tls.enabled }}
 apiVersion: apisix.apache.org/v2
 kind: ApisixTls
 metadata:
   name: "nova-ui-{{ .Release.Name }}-tls"
 spec:
+  ingressClassName: {{ .Values.apisixRoute.ingressClassName | default "apisix" | quote }}
   hosts:
     - {{ .Values.apisixRoute.ui.host | quote }}
   secret:
-    name: {{ required "apisixRoute.ui.tls.secretName is required when UI TLS is enabled" .Values.apisixRoute.ui.tls.secretName | quote }}
-    namespace: {{ default $defaultSecretNamespace .Values.apisixRoute.ui.tls.secretNamespace | quote }}
+    name: {{ required "apisixRoute.tls.secretName or apisixRoute.ui.tls.secretName is required when UI TLS is enabled" $uiSecretName | quote }}
+    namespace: {{ default $defaultSecretNamespace (get $uiTls "secretNamespace") | quote }}
 {{- end }}
 {{- if and .Values.apisixRoute.enabled .Values.apisixRoute.tls.enabled .Values.apisixRoute.cfg.enabled .Values.apisixRoute.cfg.tls.enabled }}
 ---
@@ -18,11 +27,12 @@ kind: ApisixTls
 metadata:
   name: "nova-cfg-{{ .Release.Name }}-tls"
 spec:
+  ingressClassName: {{ .Values.apisixRoute.ingressClassName | default "apisix" | quote }}
   hosts:
     - {{ .Values.apisixRoute.cfg.host | quote }}
   secret:
-    name: {{ required "apisixRoute.cfg.tls.secretName is required when CFG TLS is enabled" .Values.apisixRoute.cfg.tls.secretName | quote }}
-    namespace: {{ default $defaultSecretNamespace .Values.apisixRoute.cfg.tls.secretNamespace | quote }}
+    name: {{ required "apisixRoute.tls.secretName or apisixRoute.cfg.tls.secretName is required when CFG TLS is enabled" $cfgSecretName | quote }}
+    namespace: {{ default $defaultSecretNamespace (get $cfgTls "secretNamespace") | quote }}
 {{- end }}
 {{- if and .Values.apisixRoute.enabled .Values.apisixRoute.tls.enabled .Values.apisixRoute.grafana.enabled .Values.apisixRoute.grafana.tls.enabled }}
 ---
@@ -31,9 +41,10 @@ kind: ApisixTls
 metadata:
   name: "nova-grafana-{{ .Release.Name }}-tls"
 spec:
+  ingressClassName: {{ .Values.apisixRoute.ingressClassName | default "apisix" | quote }}
   hosts:
     - {{ .Values.apisixRoute.grafana.host | quote }}
   secret:
-    name: {{ required "apisixRoute.grafana.tls.secretName is required when Grafana TLS is enabled" .Values.apisixRoute.grafana.tls.secretName | quote }}
-    namespace: {{ default $defaultSecretNamespace .Values.apisixRoute.grafana.tls.secretNamespace | quote }}
+    name: {{ required "apisixRoute.tls.secretName or apisixRoute.grafana.tls.secretName is required when Grafana TLS is enabled" $grafanaSecretName | quote }}
+    namespace: {{ default $defaultSecretNamespace (get $grafanaTls "secretNamespace") | quote }}
 {{- end }}

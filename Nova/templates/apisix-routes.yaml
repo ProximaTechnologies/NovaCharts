@@ -4,7 +4,7 @@ kind: ApisixRoute
 metadata:
   name: "nova-ui-{{ .Release.Name }}-route"
 spec:
-  ingressClassName: apisix
+  ingressClassName: {{ .Values.apisixRoute.ingressClassName | default "apisix" | quote }}
   http:
     {{- if .Values.apisixRoute.ui.websocket.enabled }}
     - name: "nova-ui-{{ .Release.Name }}-websocket"
@@ -36,7 +36,7 @@ kind: ApisixRoute
 metadata:
   name: "nova-cfg-{{ .Release.Name }}-route"
 spec:
-  ingressClassName: apisix
+  ingressClassName: {{ .Values.apisixRoute.ingressClassName | default "apisix" | quote }}
   http:
     - name: "nova-cfg-{{ .Release.Name }}"
       match:
@@ -55,7 +55,7 @@ kind: ApisixRoute
 metadata:
   name: "nova-grafana-{{ .Release.Name }}-route"
 spec:
-  ingressClassName: apisix
+  ingressClassName: {{ .Values.apisixRoute.ingressClassName | default "apisix" | quote }}
   http:
     - name: "nova-grafana-{{ .Release.Name }}"
       match:

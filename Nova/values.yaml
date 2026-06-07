@@ -177,15 +177,16 @@ grafana:
 
 apisixRoute:
   enabled: true
+  ingressClassName: apisix
   tls:
     enabled: true
-    secretNamespace: ""
+    secretName: "domain-com-wildcard-tls"
+    secretNamespace: "cert-manager"
   ui:
     enabled: true
     host: "nova.domain.com"
     tls:
       enabled: true
-      secretName: "nova-tls"
     paths:
       - "/*"
     websocket:
@@ -198,7 +199,6 @@ apisixRoute:
     host: "cfg.domain.com"
     tls:
       enabled: true
-      secretName: "nova-tls"
     paths:
       - "/*"
   grafana:
@@ -206,7 +206,6 @@ apisixRoute:
     host: "grafana.domain.com"
     tls:
       enabled: true
-      secretName: "nova-tls"
     paths:
       - "/*"
     serviceName: "nova-grafana-service"
