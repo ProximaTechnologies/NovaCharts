@@ -75,7 +75,7 @@ metadata:
     app.kubernetes.io/instance: dragonfly-ha
 spec:
   # 1 master + N-1 replicas; operator handles failover. :contentReference[oaicite:3]{index=3}
-  replicas: 3
+  replicas: {{.Values.dragonfly.replicas}}
 
   # Pin an explicit image tag to avoid surprise upgrades. (Example tag)
   image: "docker.dragonflydb.io/dragonflydb/dragonfly:v1.21.2"  # check latest before use. :contentReference[oaicite:4]{index=4}

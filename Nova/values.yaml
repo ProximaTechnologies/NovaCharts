@@ -200,6 +200,7 @@ apisixRoute:
 dragonfly:
   storageClass: "standard"
   storage: "1Gi"
+  replicas: 3
   resources:
     requests:
       cpu: "2"
