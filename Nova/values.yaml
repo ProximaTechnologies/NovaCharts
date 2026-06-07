@@ -141,6 +141,8 @@ ui:
       value: "apisix"
 
 grafana:
+  server:
+    url: "https://grafana.domain.com"
   database:
     enabled: true
     name: grafana-db
