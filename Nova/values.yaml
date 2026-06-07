@@ -199,4 +199,4 @@ dragonfly:
   s3:
     ACCESS_KEY_ID: "test"
     SECRET_KEY_ID: "test"
-    ENDPOINT: "http://localstack.nova.svc.cluster.local:4566"
+    ENDPOINT: "http://seaweedfs.nova.svc.cluster.local:8333"
