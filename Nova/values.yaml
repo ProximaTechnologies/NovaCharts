@@ -200,6 +200,13 @@ apisixRoute:
 dragonfly:
   storageClass: "standard"
   storage: "1Gi"
+  resources:
+    requests:
+      cpu: "2"
+      memory: "16Gi"
+    limits:
+      cpu: "6"
+      memory: "32Gi"
   s3:
     ACCESS_KEY_ID: "test"
     SECRET_KEY_ID: "test"

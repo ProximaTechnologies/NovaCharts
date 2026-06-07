@@ -95,13 +95,10 @@ spec:
     name: dragonfly-tls
 
   # Resources (requests/limits) — tune to your nodes & workload
+{{- with .Values.dragonfly.resources }}
   resources:
-    requests:
-      cpu: "2"
-      memory: "16Gi"
-    limits:
-      cpu: "6"
-      memory: "32Gi"
+    {{- toYaml . | nindent 4 }}
+{{- end }}
 
   # Scheduling for resilience
   nodeSelector:
