@@ -198,6 +198,22 @@ apisixRoute:
     serviceName: "nova-grafana-service"
     servicePort: 3000
 dragonfly:
+  auth:
+    enabled: true
+    secretName: dragonfly-auth
+    secretKey: password
+    password: "CHANGEME-strong-random"
+  tls:
+    enabled: true
+    secretName: dragonfly-tls
+    issuerName: dragonfly-selfsigned
+    clusterDomain: cluster.local
+    duration: 2160h
+    renewBefore: 360h
+    privateKey:
+      algorithm: RSA
+      size: 2048
+    dnsNames: []
   storageClass: "standard"
   storage: "1Gi"
   replicas: 3

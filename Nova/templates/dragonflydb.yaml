@@ -1,26 +1,51 @@
+{{- $dragonfly := .Values.dragonfly | default dict -}}
+{{- $auth := get $dragonfly "auth" | default dict -}}
+{{- $authEnabled := true -}}
+{{- if hasKey $auth "enabled" -}}
+{{- $authEnabled = $auth.enabled -}}
+{{- end -}}
+{{- $authSecretName := get $auth "secretName" | default "dragonfly-auth" -}}
+{{- $authSecretKey := get $auth "secretKey" | default "password" -}}
+{{- $authPassword := get $auth "password" | default "CHANGEME-strong-random" -}}
+{{- $tls := get $dragonfly "tls" | default dict -}}
+{{- $tlsEnabled := true -}}
+{{- if hasKey $tls "enabled" -}}
+{{- $tlsEnabled = $tls.enabled -}}
+{{- end -}}
+{{- $tlsSecretName := get $tls "secretName" | default "dragonfly-tls" -}}
+{{- $tlsIssuerName := get $tls "issuerName" | default "dragonfly-selfsigned" -}}
+{{- $tlsClusterDomain := get $tls "clusterDomain" | default "cluster.local" -}}
+{{- $tlsDuration := get $tls "duration" | default "2160h" -}}
+{{- $tlsRenewBefore := get $tls "renewBefore" | default "360h" -}}
+{{- $tlsPrivateKey := get $tls "privateKey" | default dict -}}
+{{- $tlsPrivateKeyAlgorithm := get $tlsPrivateKey "algorithm" | default "RSA" -}}
+{{- $tlsPrivateKeySize := get $tlsPrivateKey "size" | default 2048 -}}
 # --- Namespace (optional) -----------------------------------------------------
 apiVersion: v1
 kind: Namespace
 metadata:
   name: dragonfly-prod
 
+{{- if $authEnabled }}
 ---
 # --- Client auth secret (password) -------------------------------------------
 apiVersion: v1
 kind: Secret
 metadata:
-  name: dragonfly-auth
+  name: {{ $authSecretName }}
   namespace: dragonfly-prod
 type: Opaque
 stringData:
-  password: "CHANGEME-strong-random"  # rotate via sealed-secrets/external secrets in real prod
+  {{ $authSecretKey }}: {{ $authPassword | quote }}  # rotate via sealed-secrets/external secrets in real prod
+{{- end }}
 
+{{- if $tlsEnabled }}
 ---
 # --- TLS cert managed by cert-manager ----------------------------------------
 apiVersion: cert-manager.io/v1
 kind: Issuer
 metadata:
-  name: dragonfly-selfsigned
+  name: {{ $tlsIssuerName }}
   namespace: dragonfly-prod
 spec:
   selfSigned: {}
@@ -29,15 +54,15 @@ spec:
 apiVersion: cert-manager.io/v1
 kind: Certificate
 metadata:
-  name: dragonfly-tls
+  name: {{ $tlsSecretName }}
   namespace: dragonfly-prod
 spec:
-  secretName: dragonfly-tls
-  duration: 2160h # 90 days
-  renewBefore: 360h # 15 days
+  secretName: {{ $tlsSecretName }}
+  duration: {{ $tlsDuration | quote }}
+  renewBefore: {{ $tlsRenewBefore | quote }}
   privateKey:
-    algorithm: RSA
-    size: 2048
+    algorithm: {{ $tlsPrivateKeyAlgorithm }}
+    size: {{ $tlsPrivateKeySize }}
   usages:
     - server auth
   commonName: dragonfly-ha.dragonfly-prod.svc
@@ -45,10 +70,14 @@ spec:
     - dragonfly-ha
     - dragonfly-ha.dragonfly-prod
     - dragonfly-ha.dragonfly-prod.svc
-    - dragonfly-ha.dragonfly-prod.svc.cluster.local
+    - dragonfly-ha.dragonfly-prod.svc.{{ $tlsClusterDomain }}
+    {{- with (get $tls "dnsNames") }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
   issuerRef:
-    name: dragonfly-selfsigned
+    name: {{ $tlsIssuerName }}
     kind: Issuer
+{{- end }}
 
 
 ---
@@ -87,12 +116,16 @@ spec:
     - "--hz=100"                       # tuning example; adjust to your SLOs
 
   # Auth (password) and TLS
+{{- if $authEnabled }}
   authentication:
     passwordFromSecret:
-      name: dragonfly-auth
-      key: password
+      name: {{ $authSecretName }}
+      key: {{ $authSecretKey }}
+{{- end }}
+{{- if $tlsEnabled }}
   tlsSecretRef:
-    name: dragonfly-tls
+    name: {{ $tlsSecretName }}
+{{- end }}
 
   # Resources (requests/limits) — tune to your nodes & workload
 {{- with .Values.dragonfly.resources }}
@@ -210,7 +243,9 @@ spec:
               access.dragonflydb.io/allow: "true"
       ports:
         - port: 6379   # Redis
+{{- if $tlsEnabled }}
         - port: 6380   # TLS if you expose separately
+{{- end }}
   egress:
     - to:
         - podSelector: {}         # allow intra-namespace
