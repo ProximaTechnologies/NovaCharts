@@ -47,6 +47,56 @@ spec:
       backends:
         - serviceName: "nova-cfg-{{ .Release.Name }}-service"
           servicePort: {{ .Values.cfg.service.port }}
+      {{- with .Values.apisixRoute.cfg.pluginConfig }}
+      plugin_config_name: {{ .name | quote }}
+      plugin_config_namespace: {{ .namespace | quote }}
+      {{- end }}
+{{- end }}
+{{- if and .Values.apisixRoute.enabled .Values.apisixRoute.mimir.enabled }}
+---
+apiVersion: apisix.apache.org/v2
+kind: ApisixRoute
+metadata:
+  name: "nova-mimir-{{ .Release.Name }}-route"
+spec:
+  ingressClassName: {{ .Values.apisixRoute.ingressClassName | default "apisix" | quote }}
+  http:
+    - name: "nova-mimir-{{ .Release.Name }}"
+      match:
+        hosts:
+          - {{ .Values.apisixRoute.mimir.host | quote }}
+        paths:
+          {{- toYaml .Values.apisixRoute.mimir.paths | nindent 10 }}
+      backends:
+        - serviceName: {{ .Values.apisixRoute.mimir.serviceName | quote }}
+          servicePort: {{ .Values.apisixRoute.mimir.servicePort }}
+      {{- with .Values.apisixRoute.mimir.pluginConfig }}
+      plugin_config_name: {{ .name | quote }}
+      plugin_config_namespace: {{ .namespace | quote }}
+      {{- end }}
+{{- end }}
+{{- if and .Values.apisixRoute.enabled .Values.apisixRoute.loki.enabled }}
+---
+apiVersion: apisix.apache.org/v2
+kind: ApisixRoute
+metadata:
+  name: "nova-loki-{{ .Release.Name }}-route"
+spec:
+  ingressClassName: {{ .Values.apisixRoute.ingressClassName | default "apisix" | quote }}
+  http:
+    - name: "nova-loki-{{ .Release.Name }}"
+      match:
+        hosts:
+          - {{ .Values.apisixRoute.loki.host | quote }}
+        paths:
+          {{- toYaml .Values.apisixRoute.loki.paths | nindent 10 }}
+      backends:
+        - serviceName: {{ .Values.apisixRoute.loki.serviceName | quote }}
+          servicePort: {{ .Values.apisixRoute.loki.servicePort }}
+      {{- with .Values.apisixRoute.loki.pluginConfig }}
+      plugin_config_name: {{ .name | quote }}
+      plugin_config_namespace: {{ .namespace | quote }}
+      {{- end }}
 {{- end }}
 {{- if and .Values.apisixRoute.enabled .Values.apisixRoute.grafana.enabled }}
 ---

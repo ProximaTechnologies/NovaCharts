@@ -1,10 +1,14 @@
 {{- $routeTls := .Values.apisixRoute.tls | default dict -}}
 {{- $defaultSecretName := get $routeTls "secretName" | default "" -}}
-{{- $defaultSecretNamespace := default .Release.Namespace (get $routeTls "secretNamespace") -}}
+{{- $defaultSecretNamespace := get $routeTls "secretNamespace" | default "cert-manager" -}}
 {{- $uiTls := .Values.apisixRoute.ui.tls | default dict -}}
 {{- $uiSecretName := get $uiTls "secretName" | default $defaultSecretName -}}
 {{- $cfgTls := .Values.apisixRoute.cfg.tls | default dict -}}
 {{- $cfgSecretName := get $cfgTls "secretName" | default $defaultSecretName -}}
+{{- $mimirTls := .Values.apisixRoute.mimir.tls | default dict -}}
+{{- $mimirSecretName := get $mimirTls "secretName" | default $defaultSecretName -}}
+{{- $lokiTls := .Values.apisixRoute.loki.tls | default dict -}}
+{{- $lokiSecretName := get $lokiTls "secretName" | default $defaultSecretName -}}
 {{- $grafanaTls := .Values.apisixRoute.grafana.tls | default dict -}}
 {{- $grafanaSecretName := get $grafanaTls "secretName" | default $defaultSecretName -}}
 {{- if and .Values.apisixRoute.enabled .Values.apisixRoute.tls.enabled .Values.apisixRoute.ui.enabled .Values.apisixRoute.ui.tls.enabled }}
@@ -33,6 +37,34 @@ spec:
   secret:
     name: {{ required "apisixRoute.tls.secretName or apisixRoute.cfg.tls.secretName is required when CFG TLS is enabled" $cfgSecretName | quote }}
     namespace: {{ default $defaultSecretNamespace (get $cfgTls "secretNamespace") | quote }}
+{{- end }}
+{{- if and .Values.apisixRoute.enabled .Values.apisixRoute.tls.enabled .Values.apisixRoute.mimir.enabled .Values.apisixRoute.mimir.tls.enabled }}
+---
+apiVersion: apisix.apache.org/v2
+kind: ApisixTls
+metadata:
+  name: "nova-mimir-{{ .Release.Name }}-tls"
+spec:
+  ingressClassName: {{ .Values.apisixRoute.ingressClassName | default "apisix" | quote }}
+  hosts:
+    - {{ .Values.apisixRoute.mimir.host | quote }}
+  secret:
+    name: {{ required "apisixRoute.tls.secretName or apisixRoute.mimir.tls.secretName is required when Mimir TLS is enabled" $mimirSecretName | quote }}
+    namespace: {{ default $defaultSecretNamespace (get $mimirTls "secretNamespace") | quote }}
+{{- end }}
+{{- if and .Values.apisixRoute.enabled .Values.apisixRoute.tls.enabled .Values.apisixRoute.loki.enabled .Values.apisixRoute.loki.tls.enabled }}
+---
+apiVersion: apisix.apache.org/v2
+kind: ApisixTls
+metadata:
+  name: "nova-loki-{{ .Release.Name }}-tls"
+spec:
+  ingressClassName: {{ .Values.apisixRoute.ingressClassName | default "apisix" | quote }}
+  hosts:
+    - {{ .Values.apisixRoute.loki.host | quote }}
+  secret:
+    name: {{ required "apisixRoute.tls.secretName or apisixRoute.loki.tls.secretName is required when Loki TLS is enabled" $lokiSecretName | quote }}
+    namespace: {{ default $defaultSecretNamespace (get $lokiTls "secretNamespace") | quote }}
 {{- end }}
 {{- if and .Values.apisixRoute.enabled .Values.apisixRoute.tls.enabled .Values.apisixRoute.grafana.enabled .Values.apisixRoute.grafana.tls.enabled }}
 ---

@@ -1,0 +1,29 @@
+{{- if and .Values.apisixRoute.enabled .Values.apisixRoute.mimir.enabled .Values.apisixRoute.mimir.externalName }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Values.apisixRoute.mimir.serviceName | quote }}
+spec:
+  type: ExternalName
+  externalName: {{ .Values.apisixRoute.mimir.externalName | quote }}
+  ports:
+    - name: http
+      protocol: TCP
+      port: {{ .Values.apisixRoute.mimir.servicePort }}
+      targetPort: {{ .Values.apisixRoute.mimir.servicePort }}
+{{- end }}
+{{- if and .Values.apisixRoute.enabled .Values.apisixRoute.loki.enabled .Values.apisixRoute.loki.externalName }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Values.apisixRoute.loki.serviceName | quote }}
+spec:
+  type: ExternalName
+  externalName: {{ .Values.apisixRoute.loki.externalName | quote }}
+  ports:
+    - name: http
+      protocol: TCP
+      port: {{ .Values.apisixRoute.loki.servicePort }}
+      targetPort: {{ .Values.apisixRoute.loki.servicePort }}
+{{- end }}

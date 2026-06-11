@@ -13,9 +13,9 @@ cfg:
     - name: REDIS_URL
       value: ""
     - name: MIMIR_URL
-      value: ""
+      value: "https://mimir.domain.com/api/v1/push"
     - name: LOKI_URL
-      value: ""
+      value: "https://loki.domain.com/loki/api/v1/push"
 
 postgres:
   name: nova-db
@@ -132,17 +132,24 @@ ui:
     - name: GITOPS_GRAFANA_RESYNC_PERIOD
       value: "10m"
     - name: GITOPS_MIMIR_DATASOURCE_URL
-      value: "http://mimir-nginx.monitoring.svc:9009/prometheus"
+      value: "http://mimir-gateway.mimir.svc/prometheus"
     - name: GITOPS_LOKI_DATASOURCE_URL
-      value: "http://loki-gateway.monitoring.svc"
+      value: "http://loki-gateway.loki.svc"
     - name: GITOPS_APISIX_NAMESPACE
-      value: "ingress-apisix"
+      value: "apisix"
     - name: GITOPS_APISIX_INGRESS_CLASS
       value: "apisix"
+    - name: GITOPS_APISIX_CONFIG_PLUGIN_CONFIG_NAME
+      value: "nova-config-auth"
+    - name: GITOPS_APISIX_MIMIR_PLUGIN_CONFIG_NAME
+      value: "nova-mimir-auth"
+    - name: GITOPS_APISIX_LOKI_PLUGIN_CONFIG_NAME
+      value: "nova-loki-auth"
 
 grafana:
   server:
     url: "https://grafana.domain.com"
+  config: {}
   database:
     enabled: true
     name: grafana-db
@@ -201,6 +208,35 @@ apisixRoute:
       enabled: true
     paths:
       - "/*"
+    pluginConfig:
+      name: "nova-config-auth"
+      namespace: "apisix"
+  mimir:
+    enabled: true
+    host: "mimir.domain.com"
+    tls:
+      enabled: true
+    paths:
+      - "/api/v1/push"
+    serviceName: "nova-mimir-gateway"
+    servicePort: 80
+    externalName: "mimir-gateway.mimir.svc.cluster.local"
+    pluginConfig:
+      name: "nova-mimir-auth"
+      namespace: "apisix"
+  loki:
+    enabled: true
+    host: "loki.domain.com"
+    tls:
+      enabled: true
+    paths:
+      - "/loki/api/v1/push"
+    serviceName: "nova-loki-gateway"
+    servicePort: 80
+    externalName: "loki-gateway.loki.svc.cluster.local"
+    pluginConfig:
+      name: "nova-loki-auth"
+      namespace: "apisix"
   grafana:
     enabled: true
     host: "grafana.domain.com"

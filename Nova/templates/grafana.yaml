@@ -1,6 +1,12 @@
 {{- $grafana := .Values.grafana | default dict -}}
 {{- $server := get $grafana "server" | default dict -}}
 {{- $serverUrl := get $server "url" | default "" -}}
+{{- $userConfig := get $grafana "config" | default dict -}}
+{{- $grafanaConfig := dict "log" (dict "mode" "console") -}}
+{{- if $serverUrl -}}
+{{- $_ := set $grafanaConfig "server" (dict "root_url" $serverUrl) -}}
+{{- end -}}
+{{- $grafanaConfig = mergeOverwrite $grafanaConfig $userConfig -}}
 {{- $database := get $grafana "database" | default dict -}}
 {{- $databaseEnabled := true -}}
 {{- if hasKey $database "enabled" -}}
@@ -27,12 +33,7 @@ metadata:
     dashboards: nova-grafana
 spec:
   config:
-    log:
-      mode: console
-    {{- if $serverUrl }}
-    server:
-      root_url: {{ $serverUrl | quote }}
-    {{- end }}
+{{- toYaml $grafanaConfig | nindent 4 }}
   deployment:
     spec:
       replicas: 1
