@@ -1,0 +1,30 @@
+{{- if .Values.workers.enabled }}
+{{- $workerArgs := .Values.workers.args | default (list "celery" "-A" "NovaUI" "worker" "-l" "INFO" "-B") -}}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: "nova-workers-{{.Release.Name}}-deployment"
+spec:
+  selector:
+    matchLabels:
+      app: "nova-workers-{{.Release.Name}}"
+  template:
+    metadata:
+      labels:
+        app: "nova-workers-{{.Release.Name}}"
+    spec:
+      containers:
+        - name: "nova-workers-{{.Release.Name}}"
+          image: "{{ .Values.ui.image.registry}}/{{.Values.ui.image.image}}:{{.Values.ui.image.tag}}"
+          imagePullPolicy: {{.Values.ui.image.imagePullPolicy}}
+          args: {{ $workerArgs | toJson }}
+          {{- with (.Values.workers.env | default .Values.ui.env) }}
+          env:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.workers.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+  replicas: {{.Values.workers.replicas}}
+{{- end }}

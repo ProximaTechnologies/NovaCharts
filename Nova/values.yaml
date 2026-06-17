@@ -146,6 +146,19 @@ ui:
     - name: GITOPS_APISIX_LOKI_PLUGIN_CONFIG_NAME
       value: "nova-loki-auth"
 
+workers:
+  enabled: true
+  replicas: 1
+  args:
+    - celery
+    - "-A"
+    - NovaUI
+    - worker
+    - "-l"
+    - INFO
+    - "-B"
+  resources: {}
+
 grafana:
   server:
     url: "https://grafana.domain.com"
