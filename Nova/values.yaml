@@ -67,6 +67,8 @@ ui:
       value: ""
     - name: UI_URL
       value: ""
+    - name: NOVA_SUPERVISOR_ALLOY_VERSION
+      value: "v1.10.2"
     - name: GRAFANA_PROTOCOL
       value: "http"
     - name: GRAFANA_HOST
