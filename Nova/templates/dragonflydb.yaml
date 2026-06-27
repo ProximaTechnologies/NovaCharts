@@ -1,4 +1,11 @@
 {{- $dragonfly := .Values.dragonfly | default dict -}}
+{{- $namespace := get $dragonfly "namespace" | default "dragonfly-prod" -}}
+{{- $name := get $dragonfly "name" | default "dragonfly-ha" -}}
+{{- $replicas := get $dragonfly "replicas" | default 3 -}}
+{{- $image := get $dragonfly "image" | default "docker.dragonflydb.io/dragonflydb/dragonfly:v1.21.2" -}}
+{{- $maxmemory := get $dragonfly "maxmemory" | default "24gb" -}}
+{{- $hz := get $dragonfly "hz" | default 100 -}}
+
 {{- $auth := get $dragonfly "auth" | default dict -}}
 {{- $authEnabled := true -}}
 {{- if hasKey $auth "enabled" -}}
@@ -7,6 +14,7 @@
 {{- $authSecretName := get $auth "secretName" | default "dragonfly-auth" -}}
 {{- $authSecretKey := get $auth "secretKey" | default "password" -}}
 {{- $authPassword := get $auth "password" | default "CHANGEME-strong-random" -}}
+
 {{- $tls := get $dragonfly "tls" | default dict -}}
 {{- $tlsEnabled := true -}}
 {{- if hasKey $tls "enabled" -}}
@@ -20,33 +28,44 @@
 {{- $tlsPrivateKey := get $tls "privateKey" | default dict -}}
 {{- $tlsPrivateKeyAlgorithm := get $tlsPrivateKey "algorithm" | default "RSA" -}}
 {{- $tlsPrivateKeySize := get $tlsPrivateKey "size" | default 2048 -}}
-# --- Namespace (optional) -----------------------------------------------------
+
+{{- $snapshot := get $dragonfly "snapshot" | default dict -}}
+{{- $snapshotEnabled := true -}}
+{{- if hasKey $snapshot "enabled" -}}
+{{- $snapshotEnabled = $snapshot.enabled -}}
+{{- end -}}
+{{- $snapshotCron := get $snapshot "cron" | default "0 */6 * * *" -}}
+{{- $snapshotDbFilename := get $snapshot "dbfilename" | default "dragonfly-cache" -}}
+{{- $snapshotStorage := get $snapshot "storage" | default (get $dragonfly "storage" | default "100Gi") -}}
+{{- $snapshotStorageClass := get $snapshot "storageClassName" | default (get $dragonfly "storageClass" | default "") -}}
+
+# --- Namespace ---------------------------------------------------------------
 apiVersion: v1
 kind: Namespace
 metadata:
-  name: dragonfly-prod
+  name: {{ $namespace }}
 
 {{- if $authEnabled }}
 ---
-# --- Client auth secret (password) -------------------------------------------
+# --- Client auth secret ------------------------------------------------------
 apiVersion: v1
 kind: Secret
 metadata:
   name: {{ $authSecretName }}
-  namespace: dragonfly-prod
+  namespace: {{ $namespace }}
 type: Opaque
 stringData:
-  {{ $authSecretKey }}: {{ $authPassword | quote }}  # rotate via sealed-secrets/external secrets in real prod
+  {{ $authSecretKey }}: {{ $authPassword | quote }}
 {{- end }}
 
 {{- if $tlsEnabled }}
 ---
-# --- TLS cert managed by cert-manager ----------------------------------------
+# --- TLS cert managed by cert-manager ---------------------------------------
 apiVersion: cert-manager.io/v1
 kind: Issuer
 metadata:
   name: {{ $tlsIssuerName }}
-  namespace: dragonfly-prod
+  namespace: {{ $namespace }}
 spec:
   selfSigned: {}
 
@@ -55,7 +74,7 @@ apiVersion: cert-manager.io/v1
 kind: Certificate
 metadata:
   name: {{ $tlsSecretName }}
-  namespace: dragonfly-prod
+  namespace: {{ $namespace }}
 spec:
   secretName: {{ $tlsSecretName }}
   duration: {{ $tlsDuration | quote }}
@@ -65,12 +84,12 @@ spec:
     size: {{ $tlsPrivateKeySize }}
   usages:
     - server auth
-  commonName: dragonfly-ha.dragonfly-prod.svc
+  commonName: {{ $name }}.{{ $namespace }}.svc
   dnsNames:
-    - dragonfly-ha
-    - dragonfly-ha.dragonfly-prod
-    - dragonfly-ha.dragonfly-prod.svc
-    - dragonfly-ha.dragonfly-prod.svc.{{ $tlsClusterDomain }}
+    - {{ $name }}
+    - {{ $name }}.{{ $namespace }}
+    - {{ $name }}.{{ $namespace }}.svc
+    - {{ $name }}.{{ $namespace }}.svc.{{ $tlsClusterDomain }}
     {{- with (get $tls "dnsNames") }}
     {{- toYaml . | nindent 4 }}
     {{- end }}
@@ -79,43 +98,30 @@ spec:
     kind: Issuer
 {{- end }}
 
-
----
-apiVersion: v1
-kind: Secret
-metadata:
-  name: dragonfly-s3-credentials
-  namespace: dragonfly-prod
-type: Opaque
-stringData:
-  AWS_ACCESS_KEY_ID: {{ .Values.dragonfly.s3.ACCESS_KEY_ID | quote }}
-  AWS_SECRET_ACCESS_KEY: {{ .Values.dragonfly.s3.SECRET_KEY_ID | quote }}
-  AWS_ENDPOINT_URL: {{.Values.dragonfly.s3.ENDPOINT | quote}}
-  AWS_REGION: "us-east-1"
-
 ---
 apiVersion: dragonflydb.io/v1alpha1
 kind: Dragonfly
 metadata:
-  name: dragonfly-ha
-  namespace: dragonfly-prod
+  name: {{ $name }}
+  namespace: {{ $namespace }}
   labels:
     app.kubernetes.io/name: dragonfly
-    app.kubernetes.io/instance: dragonfly-ha
+    app.kubernetes.io/instance: {{ $name }}
 spec:
-  # 1 master + N-1 replicas; operator handles failover. :contentReference[oaicite:3]{index=3}
-  replicas: {{.Values.dragonfly.replicas}}
+  replicas: {{ $replicas }}
+  image: {{ $image | quote }}
 
-  # Pin an explicit image tag to avoid surprise upgrades. (Example tag)
-  image: "docker.dragonflydb.io/dragonflydb/dragonfly:v1.21.2"  # check latest before use. :contentReference[oaicite:4]{index=4}
-
-  # Dragonfly runtime args (keep minimal & explicit)
+  # Cache-oriented runtime args.
+  # --dbfilename is important: it makes snapshots overwrite one rolling file
+  # instead of accumulating timestamped snapshot files until the PVC fills up.
   args:
-    - "--cluster_mode=emulated"        # operator-managed HA topology
-    - "--maxmemory=24gb"               # size to suit node capacity
-    - "--hz=100"                       # tuning example; adjust to your SLOs
+    - "--cluster_mode=emulated"
+    - "--maxmemory={{ $maxmemory }}"
+    - "--hz={{ $hz }}"
+{{- if $snapshotEnabled }}
+    - "--dbfilename={{ $snapshotDbFilename }}"
+{{- end }}
 
-  # Auth (password) and TLS
 {{- if $authEnabled }}
   authentication:
     passwordFromSecret:
@@ -127,13 +133,12 @@ spec:
     name: {{ $tlsSecretName }}
 {{- end }}
 
-  # Resources (requests/limits) — tune to your nodes & workload
-{{- with .Values.dragonfly.resources }}
+{{- with (get $dragonfly "resources") }}
   resources:
     {{- toYaml . | nindent 4 }}
 {{- end }}
 
-{{- with .Values.dragonfly.scheduling }}
+{{- with (get $dragonfly "scheduling") }}
 {{- if .enabled }}
 {{- with .nodeSelector }}
   nodeSelector:
@@ -154,108 +159,94 @@ spec:
 {{- end }}
 {{- end }}
 
-  # Service configuration (cluster-internal Redis endpoint)
   serviceSpec:
     type: ClusterIP
     annotations:
-      # If you front this with an internal LB/Ingress, add your annotations here.
-      prometheus.io/scrape: "true"   # harmless; PodMonitor is preferred
+      prometheus.io/scrape: "true"
 
+{{- if $snapshotEnabled }}
+  # Warm-cache snapshot. This keeps one rolling snapshot because --dbfilename
+  # is static. Do not use S3 backup wiring for disposable cache unless you
+  # explicitly want durable cache backups.
   snapshot:
-    cron: "0 */1 * * *"               # hourly snapshot cadence
-    dir: "s3://my-df-prod-backups"    # change to your bucket/path (or omit to use only PVC)
+    cron: {{ $snapshotCron | quote }}
     persistentVolumeClaimSpec:
       accessModes: ["ReadWriteOnce"]
-      storageClassName: {{.Values.dragonfly.storageClass}}
+{{- if $snapshotStorageClass }}
+      storageClassName: {{ $snapshotStorageClass | quote }}
+{{- end }}
       resources:
         requests:
-          storage: {{.Values.dragonfly.storage}}
+          storage: {{ $snapshotStorage | quote }}
+{{- end }}
 
-  # Extra labels for selecting via PodMonitor/NetworkPolicy, etc.
   labels:
-    app: dragonfly-ha
-
-  env:
-    - name: AWS_ACCESS_KEY_ID
-      valueFrom:
-        secretKeyRef:
-          name: dragonfly-s3-credentials
-          key: AWS_ACCESS_KEY_ID
-
-    - name: AWS_SECRET_ACCESS_KEY
-      valueFrom:
-        secretKeyRef:
-          name: dragonfly-s3-credentials
-          key: AWS_SECRET_ACCESS_KEY
-
-    - name: DFLY_s3_endpoint
-      valueFrom:
-        secretKeyRef:
-          name: dragonfly-s3-credentials
-          key: AWS_ENDPOINT_URL
-
-    - name: AWS_REGION
-      valueFrom:
-        secretKeyRef:
-          name: dragonfly-s3-credentials
-          key: AWS_REGION
+    app: {{ $name }}
 
 ---
-# --- Prometheus PodMonitor (Prometheus Operator CRDs required) ----------------
-# The operator exposes an 'admin' port that PodMonitor can scrape. :contentReference[oaicite:6]{index=6}
+# --- Prometheus PodMonitor ---------------------------------------------------
 apiVersion: monitoring.coreos.com/v1
 kind: PodMonitor
 metadata:
-  name: dragonfly-ha
-  namespace: dragonfly-prod
+  name: {{ $name }}
+  namespace: {{ $namespace }}
   labels:
     release: prometheus
 spec:
   selector:
     matchLabels:
-      app: dragonfly-ha   # must match spec.labels on Dragonfly pods. :contentReference[oaicite:7]{index=7}
+      app: {{ $name }}
   namespaceSelector:
-    matchNames: ["dragonfly-prod"]
+    matchNames:
+      - {{ $namespace }}
   podMetricsEndpoints:
     - port: admin
       interval: 15s
       scrapeTimeout: 10s
 
 ---
-# --- NetworkPolicy: default deny + allow same-namespace + selected callers ----
+# --- NetworkPolicy -----------------------------------------------------------
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
-  name: dragonfly-ha-default-deny
-  namespace: dragonfly-prod
+  name: {{ $name }}-default-deny
+  namespace: {{ $namespace }}
 spec:
   podSelector:
     matchLabels:
-      app: dragonfly-ha
-  policyTypes: ["Ingress","Egress"]
+      app: {{ $name }}
+  policyTypes:
+    - Ingress
+    - Egress
   ingress:
     - from:
-        # Allow same-namespace pods (app traffic, redis-cli jobs, etc.)
         - podSelector: {}
-        # Example: allow from app namespaces (edit to your env)
         - namespaceSelector:
             matchLabels:
               access.dragonflydb.io/allow: "true"
       ports:
-        - port: 6379   # Redis
+        - port: 6379
+          protocol: TCP
 {{- if $tlsEnabled }}
-        - port: 6380   # TLS if you expose separately
+        - port: 6380
+          protocol: TCP
 {{- end }}
+    # Allow Prometheus scraping only from namespaces that are explicitly labeled.
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              monitoring.dragonflydb.io/allow: "true"
+      ports:
+        - port: admin
   egress:
+    # Allow Dragonfly pods to talk to same-namespace pods for operator-managed HA.
     - to:
-        - podSelector: {}         # allow intra-namespace
-        - namespaceSelector: {}   # allow kube DNS, etc. Narrow further in prod
+        - podSelector: {}
+    # Allow DNS. Narrow this to kube-dns/CoreDNS labels if your cluster standardizes them.
+    - to:
+        - namespaceSelector: {}
       ports:
         - port: 53
           protocol: UDP
-    - to:
-        - ipBlock:
-            cidr: 0.0.0.0/0       # needed for S3; restrict to cloud endpoints if possible
-      ports:
-        - port: 443
+        - port: 53
           protocol: TCP

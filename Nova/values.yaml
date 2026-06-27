@@ -260,6 +260,18 @@ apisixRoute:
     serviceName: "nova-grafana-service"
     servicePort: 3000
 dragonfly:
+  namespace: dragonfly-prod
+  name: dragonfly-ha
+  image: docker.dragonflydb.io/dragonflydb/dragonfly:v1.21.2
+
+  maxmemory: 24gb
+  hz: 100
+
+  snapshot:
+    enabled: true
+    cron: "0 */6 * * *"
+    dbfilename: dragonfly-cache
+    storage: 10Gi
   auth:
     enabled: true
     secretName: dragonfly-auth
