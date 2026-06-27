@@ -43,6 +43,8 @@ ui:
     enabled: true
     timeoutSeconds: 300
     intervalSeconds: 2
+  bootstrapInstall:
+    registerSupervisorVersion: true
   replicas: 1
   service:
     type: ClusterIP

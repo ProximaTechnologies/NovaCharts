@@ -17,7 +17,12 @@ spec:
         - name: "nova-ui-{{ .Release.Name }}-bootstrap-install"
           image: "{{ .Values.ui.image.registry }}/{{ .Values.ui.image.image }}:{{ .Values.ui.image.tag }}"
           imagePullPolicy: {{ .Values.ui.image.imagePullPolicy }}
-          command: ["./manage.py", "bootstrap_install"]
+          command:
+            - ./manage.py
+            - bootstrap_install
+            {{- if .Values.ui.bootstrapInstall.registerSupervisorVersion }}
+            - --register-supervisor-version
+            {{- end }}
           {{- with .Values.ui.env }}
           env:
             {{- toYaml . | nindent 12 }}
