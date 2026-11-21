@@ -1,0 +1,78 @@
+name: Build and release Helm chart
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: helm-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  HELM_VERSION: v4.3.0
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: azure/setup-helm@v4.3.1
+        with:
+          version: ${{ env.HELM_VERSION }}
+      - name: Validate chart
+        run: |
+          helm lint Nova --strict
+          helm template nova Nova > "$RUNNER_TEMP/nova-rendered.yaml"
+      - name: Check release version
+        if: startsWith(github.ref, 'refs/tags/')
+        shell: bash
+        run: |
+          chart_version=$(helm show chart Nova | awk '$1 == "version:" { print $2 }')
+          if [[ "$GITHUB_REF_NAME" != "v${chart_version}" ]]; then
+            echo "::error::Release tag must be v${chart_version} to match Nova/Chart.yaml"
+            exit 1
+          fi
+      - name: Package chart
+        run: helm package Nova --destination dist
+      - uses: actions/upload-artifact@v4
+        with:
+          name: nova-chart
+          path: dist/*.tgz
+          if-no-files-found: error
+
+  publish:
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: azure/setup-helm@v4.3.1
+        with:
+          version: ${{ env.HELM_VERSION }}
+      - uses: actions/download-artifact@v4
+        with:
+          name: nova-chart
+          path: dist
+      - name: Log in to GHCR
+        env:
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: printf '%s' "$GHCR_TOKEN" | helm registry login ghcr.io --username "$GITHUB_ACTOR" --password-stdin
+      - name: Publish chart
+        shell: bash
+        run: |
+          repository="${GITHUB_REPOSITORY,,}"
+          helm push dist/*.tgz "oci://ghcr.io/${repository}"
+          echo "Published oci://ghcr.io/${repository}/nova:${GITHUB_REF_NAME#v}" >> "$GITHUB_STEP_SUMMARY"
+      - name: Log out of GHCR
+        if: always()
+        run: helm registry logout ghcr.io
